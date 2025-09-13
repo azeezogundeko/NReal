@@ -2,16 +2,26 @@
 LiveKit worker entrypoint for translation agents.
 """
 import asyncio
+import json
 import logging
+from dotenv import load_dotenv
 
 from livekit.agents import JobContext, WorkerOptions, cli
+from supabase import create_client
 
+from app.core.config import get_settings
+from app.db.models import DatabaseService
 from app.services.livekit.room_manager import PatternBRoomManager
 from app.services.livekit.agent import LiveKitService
 
+# Initialize services
+load_dotenv()
+settings = get_settings()
+supabase = create_client(settings.supabase_url, settings.supabase_service_role_key or settings.supabase_anon_key)
+db_service = DatabaseService(supabase)
 
 # Global instances
-room_manager = PatternBRoomManager()
+room_manager = PatternBRoomManager(db_service)
 livekit_service = LiveKitService(room_manager)
 
 
@@ -21,8 +31,20 @@ async def entrypoint(ctx: JobContext):
     Each worker instance handles ONE user's translation needs.
     """
 
-    # Extract user identity from room or job metadata
-    participant_identity = ctx.room.local_participant.identity
+    # Extract user identity from job metadata (set during dispatch)
+    participant_identity = None
+    if ctx.job.metadata:
+        try:
+            metadata = json.loads(ctx.job.metadata)
+            participant_identity = metadata.get("user_identity")
+            logging.info(f"Agent metadata: {metadata}")
+        except Exception as e:
+            logging.warning(f"Failed to parse job metadata: {e}")
+    
+    # Fallback to room participant if no metadata
+    if not participant_identity:
+        participant_identity = ctx.room.local_participant.identity
+        logging.warning("Using room participant identity as fallback")
 
     logging.info(f"Starting translation worker for user: {participant_identity}")
     logging.info(f"Room: {ctx.room.name}")
@@ -51,11 +73,11 @@ if __name__ == "__main__":
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
 
-    # Run the LiveKit Agents worker
+    # Run the LiveKit Agents worker with explicit dispatch
     cli.run_app(
         WorkerOptions(
             entrypoint_fnc=entrypoint,
-            # Each user gets their own worker process
-            agent_dispatch=True,
+            # Use explicit agent dispatch with a named agent
+            agent_name="translation-agent",
         )
     )

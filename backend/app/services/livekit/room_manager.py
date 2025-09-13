@@ -1,11 +1,24 @@
 """
 LiveKit room management service with Supabase persistence.
 """
-from typing import Dict, Optional
+import time
+from typing import Dict, Optional, NamedTuple
 
 from app.db.models import DatabaseService, UserProfile, Room
 from app.models.domain.profiles import UserLanguageProfile, SupportedLanguage, VoiceAvatar, VOICE_AVATARS
 from app.models.domain.rooms import RoomCreateRequest
+
+
+class CachedUserProfile(NamedTuple):
+    """User profile with cache metadata."""
+    profile: UserLanguageProfile
+    cached_at: float  # Unix timestamp
+    ttl_seconds: int = 1800  # 30 minutes
+    
+    @property
+    def is_expired(self) -> bool:
+        """Check if the cached profile has expired."""
+        return time.time() - self.cached_at > self.ttl_seconds
 
 
 class PatternBRoomManager:
@@ -13,20 +26,49 @@ class PatternBRoomManager:
 
     def __init__(self, db_service: DatabaseService):
         self.db = db_service
-        self.user_profiles_cache: Dict[str, UserLanguageProfile] = {}  # For performance
+        # TTL-based cache with 30-minute expiration
+        self.user_profiles_cache: Dict[str, CachedUserProfile] = {}
+        self.cache_ttl_seconds = 1800  # 30 minutes
 
     def register_user_profile(self, profile: UserLanguageProfile):
-        """Register a user's language profile in cache."""
-        self.user_profiles_cache[profile.user_identity] = profile
+        """Register a user's language profile in cache with TTL."""
+        cached_profile = CachedUserProfile(
+            profile=profile,
+            cached_at=time.time(),
+            ttl_seconds=self.cache_ttl_seconds
+        )
+        self.user_profiles_cache[profile.user_identity] = cached_profile
+        
+    def cache_user_profile(self, profile: UserLanguageProfile):
+        """Cache a user profile with current timestamp."""
+        self.register_user_profile(profile)
 
     async def get_user_profile(self, user_identity: str) -> Optional[UserLanguageProfile]:
-        """Get user profile from database or cache."""
-        # Check cache first
+        """Get user profile from cache (with TTL) or database."""
+        import logging
+        
+        # Check cache first and validate TTL
         if user_identity in self.user_profiles_cache:
-            return self.user_profiles_cache[user_identity]
+            cached_entry = self.user_profiles_cache[user_identity]
+            if not cached_entry.is_expired:
+                logging.debug(f"Cache hit for user {user_identity}")
+                return cached_entry.profile
+            else:
+                # Remove expired entry
+                del self.user_profiles_cache[user_identity]
+                logging.debug(f"Cache expired for user {user_identity}, removed from cache")
 
-        # Get from database
-        db_profile = await self.db.get_user_profile(user_identity)
+        # Clean up other expired entries while we're here
+        self._cleanup_expired_cache()
+
+        # Get from database with error handling
+        try:
+            db_profile = await self.db.get_user_profile(user_identity)
+        except Exception as e:
+            logging.error(f"Database error getting user profile for {user_identity}: {e}")
+            # Fallback to creating default profile
+            return await self._create_default_profile(user_identity)
+            
         if db_profile:
             # Convert to domain model
             profile = UserLanguageProfile(
@@ -38,12 +80,41 @@ class PatternBRoomManager:
                     "preserve_emotion": db_profile.preserve_emotion,
                 }
             )
-            # Cache it
-            self.user_profiles_cache[user_identity] = profile
+            # Cache it with TTL
+            self.cache_user_profile(profile)
+            logging.info(f"Cached user profile for {user_identity} (30 min TTL)")
             return profile
 
         # Create default profile if none exists
         return await self._create_default_profile(user_identity)
+
+    def _cleanup_expired_cache(self):
+        """Remove expired entries from cache."""
+        current_time = time.time()
+        expired_keys = [
+            user_identity for user_identity, cached_entry in self.user_profiles_cache.items()
+            if cached_entry.is_expired
+        ]
+        
+        for key in expired_keys:
+            del self.user_profiles_cache[key]
+            
+        if expired_keys:
+            import logging
+            logging.debug(f"Cleaned up {len(expired_keys)} expired cache entries")
+
+    def get_cache_stats(self) -> dict:
+        """Get cache statistics for monitoring."""
+        total_entries = len(self.user_profiles_cache)
+        expired_entries = sum(1 for entry in self.user_profiles_cache.values() if entry.is_expired)
+        active_entries = total_entries - expired_entries
+        
+        return {
+            "total_entries": total_entries,
+            "active_entries": active_entries,
+            "expired_entries": expired_entries,
+            "cache_ttl_seconds": self.cache_ttl_seconds
+        }
 
     def _get_voice_avatar_from_db(self, db_profile: UserProfile) -> VoiceAvatar:
         """Get voice avatar from database profile."""
@@ -78,10 +149,15 @@ class PatternBRoomManager:
 
         try:
             await self.db.create_user_profile(db_profile)
-            self.user_profiles_cache[user_identity] = default_profile
+            # Cache the default profile with TTL
+            self.cache_user_profile(default_profile)
+            import logging
+            logging.info(f"Created and cached default profile for {user_identity}")
         except Exception as e:
-            # If database fails, still return default profile
-            pass
+            # If database fails, still cache the default profile
+            self.cache_user_profile(default_profile)
+            import logging
+            logging.warning(f"Database save failed for default profile {user_identity}, but cached: {e}")
 
         return default_profile
 

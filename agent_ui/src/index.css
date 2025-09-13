@@ -1,0 +1,230 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Dark theme colors - Black based */
+  --lk-bg: #000000;
+  --lk-bg-secondary: #111111;
+  --lk-bg-tertiary: #222222;
+  --lk-fg: #ffffff;
+  --lk-fg-secondary: #e5e5e5;
+  --lk-fg-tertiary: #cccccc;
+  
+  /* Accent colors - Black and white */
+  --lk-accent-bg: #333333;
+  --lk-accent-fg: #ffffff;
+  
+  /* Status colors */
+  --lk-danger: #ef4444;
+  --lk-danger-fg: #ffffff;
+  --lk-success: #10b981;
+  --lk-success-fg: #ffffff;
+  --lk-warning: #f59e0b;
+  --lk-warning-fg: #ffffff;
+  
+  /* Connection quality colors */
+  --lk-connection-excellent: #10b981;
+  --lk-connection-good: #f59e0b;
+  --lk-connection-poor: #ef4444;
+  
+  /* Control colors */
+  --lk-control-fg: var(--lk-fg);
+  --lk-control-bg: var(--lk-bg-secondary);
+  --lk-control-border: #333333;
+  
+  /* Interactive elements */
+  --lk-button-primary-bg: #333333;
+  --lk-button-primary-fg: #ffffff;
+  --lk-button-secondary-bg: #222222;
+  --lk-button-secondary-fg: #ffffff;
+  --lk-button-danger-bg: #ef4444;
+  --lk-button-danger-fg: #ffffff;
+  
+  /* Form elements */
+  --lk-input-bg: #111111;
+  --lk-input-border: #333333;
+  --lk-input-fg: #ffffff;
+  --lk-input-placeholder: #888888;
+  
+  /* Overlay and modal colors */
+  --lk-overlay-bg: rgba(0, 0, 0, 0.9);
+  --lk-modal-bg: #111111;
+  --lk-modal-border: #333333;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: var(--lk-bg);
+  color: var(--lk-fg);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Force dark mode for all elements */
+* {
+  color-scheme: dark;
+}
+
+/* Ensure all text inputs and form elements use dark theme */
+input, textarea, select, button {
+  color-scheme: dark;
+}
+
+/* Scrollbar styling for dark theme */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--lk-bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--lk-bg-tertiary);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+/* Custom component styles */
+.gradient-bg {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.glass-effect {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.avatar-glow {
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+}
+
+.speaking-indicator {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* LiveKit component overrides for dark theme */
+.lk-room-container {
+  height: 100vh;
+  background: var(--lk-bg);
+  color: var(--lk-fg);
+}
+
+.lk-participant-tile {
+  background: var(--lk-bg-secondary);
+  border-radius: 12px;
+  border: 2px solid var(--lk-control-border);
+  transition: all 0.3s ease;
+  color: var(--lk-fg);
+}
+
+.lk-participant-tile[data-lk-speaking="true"] {
+  border-color: var(--lk-accent-bg);
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.4);
+}
+
+.lk-control-bar {
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(20px);
+  border-radius: 16px;
+  border: 1px solid var(--lk-control-border);
+  color: var(--lk-fg);
+}
+
+.lk-button {
+  background: var(--lk-button-secondary-bg);
+  color: var(--lk-button-secondary-fg);
+  border: 1px solid var(--lk-control-border);
+  transition: all 0.2s ease;
+}
+
+.lk-button:hover {
+  background: var(--lk-bg-tertiary);
+  border-color: var(--lk-accent-bg);
+}
+
+.lk-button[data-lk-enabled="true"] {
+  background: var(--lk-button-primary-bg);
+  color: var(--lk-button-primary-fg);
+  border-color: var(--lk-accent-bg);
+}
+
+.lk-button[data-lk-variant="danger"] {
+  background: var(--lk-button-danger-bg);
+  color: var(--lk-button-danger-fg);
+  border-color: var(--lk-danger);
+}
+
+.lk-chat {
+  background: var(--lk-modal-bg);
+  border: 1px solid var(--lk-modal-border);
+  color: var(--lk-fg);
+}
+
+.lk-chat-entry {
+  background: var(--lk-bg-secondary);
+  border: 1px solid var(--lk-control-border);
+  color: var(--lk-fg);
+}
+
+.lk-chat-entry::placeholder {
+  color: var(--lk-input-placeholder);
+}
+
+/* Video track styling */
+.lk-video-track {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* Audio visualization */
+.lk-audio-visualizer {
+  color: var(--lk-accent-bg);
+}
+
+/* Connection quality indicators */
+.lk-connection-quality[data-lk-quality="excellent"] {
+  color: var(--lk-connection-excellent);
+}
+
+.lk-connection-quality[data-lk-quality="good"] {
+  color: var(--lk-connection-good);
+}
+
+.lk-connection-quality[data-lk-quality="poor"] {
+  color: var(--lk-connection-poor);
+}
+
+/* Focus layout */
+.lk-focus-layout {
+  background: var(--lk-bg);
+}
+
+.lk-grid-layout {
+  background: var(--lk-bg);
+}

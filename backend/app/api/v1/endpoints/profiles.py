@@ -22,6 +22,32 @@ def get_profile_api() -> ProfileAPI:
 
 router = APIRouter()
 
+@router.get("/{user_identity}", response_model=UserProfileResponse)
+async def get_user_profile(
+    user_identity: str,
+    profile_api: ProfileAPI = Depends(get_profile_api)
+):
+    """Get user profile - creates default profile if none exists."""
+    from app.main import app
+    # Use room_manager to get or create profile (it has the get-or-create logic)
+    profile = await app.state.room_manager.get_user_profile(user_identity)
+    # print(profile)
+    if not profile:
+        raise HTTPException(status_code=404, detail="User profile not found")
+
+    return UserProfileResponse(
+        user_identity=profile.user_identity,
+        native_language=profile.native_language.value,
+        voice_avatar={
+            "voice_id": profile.preferred_voice_avatar.voice_id,
+            "provider": profile.preferred_voice_avatar.provider,
+            "name": profile.preferred_voice_avatar.name,
+            "gender": profile.preferred_voice_avatar.gender,
+            "accent": profile.preferred_voice_avatar.accent,
+            "description": profile.preferred_voice_avatar.description,
+        },
+        translation_preferences=profile.translation_preferences
+    )
 
 @router.post("/", response_model=UserProfileResponse)
 async def create_user_profile(
@@ -70,28 +96,3 @@ async def update_voice_avatar(
     return {"success": True, "message": "Voice avatar updated"}
 
 
-@router.get("/{user_identity}", response_model=UserProfileResponse)
-async def get_user_profile(
-    user_identity: str,
-    profile_api: ProfileAPI = Depends(get_profile_api)
-):
-    """Get user profile."""
-    # This will be replaced with proper dependency injection
-    from app.main import app
-    profile = await app.state.room_manager.get_user_profile(user_identity)
-    if not profile:
-        raise HTTPException(status_code=404, detail="User profile not found")
-
-    return UserProfileResponse(
-        user_identity=profile.user_identity,
-        native_language=profile.native_language.value,
-        voice_avatar={
-            "voice_id": profile.preferred_voice_avatar.voice_id,
-            "provider": profile.preferred_voice_avatar.provider,
-            "name": profile.preferred_voice_avatar.name,
-            "gender": profile.preferred_voice_avatar.gender,
-            "accent": profile.preferred_voice_avatar.accent,
-            "description": profile.preferred_voice_avatar.description,
-        },
-        translation_preferences=profile.translation_preferences
-    )

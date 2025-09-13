@@ -4,6 +4,7 @@ Translation service for handling text translation with AI providers.
 from typing import Dict, Optional
 
 from livekit.agents import llm
+from livekit.plugins import openai, google
 
 from app.core.config import get_settings
 from app.models.domain.profiles import SupportedLanguage
@@ -14,9 +15,9 @@ class TranslationService:
 
     def __init__(self):
         settings = get_settings()
-        self.llm = llm.openai.LLM(
-            api_key=settings.openai_api_key,
-            model="gpt-4o-mini",
+        self.llm = google.LLM(
+            api_key=settings.gemini_api_key,
+            model="gemini-2.0-flash",
             temperature=0.3,
         )
 

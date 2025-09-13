@@ -84,21 +84,26 @@ class DatabaseService:
 
     async def get_user_profile(self, user_identity: str) -> Optional[UserProfile]:
         """Get user profile by identity."""
-        result = self.supabase.table("user_profiles").select("*").eq("user_identity", user_identity).execute()
-        if result.data:
-            profile_data = result.data[0]
-            return UserProfile(
-                id=profile_data["id"],
-                user_identity=profile_data["user_identity"],
-                native_language=profile_data["native_language"],
-                voice_avatar_id=profile_data["voice_avatar_id"],
-                voice_provider=profile_data["voice_provider"],
-                formal_tone=profile_data["formal_tone"],
-                preserve_emotion=profile_data["preserve_emotion"],
-                created_at=profile_data["created_at"],
-                updated_at=profile_data["updated_at"],
-            )
-        return None
+        try:
+            result = self.supabase.table("user_profiles").select("*").eq("user_identity", user_identity).execute()
+            if result.data:
+                profile_data = result.data[0]
+                return UserProfile(
+                    id=profile_data["id"],
+                    user_identity=profile_data["user_identity"],
+                    native_language=profile_data["native_language"],
+                    voice_avatar_id=profile_data["voice_avatar_id"],
+                    voice_provider=profile_data["voice_provider"],
+                    formal_tone=profile_data["formal_tone"],
+                    preserve_emotion=profile_data["preserve_emotion"],
+                    created_at=profile_data["created_at"],
+                    updated_at=profile_data["updated_at"],
+                )
+            return None
+        except Exception as e:
+            import logging
+            logging.error(f"Failed to get user profile for {user_identity}: {e}")
+            return None
 
     async def update_user_profile(self, user_identity: str, updates: Dict[str, Any]) -> bool:
         """Update user profile."""

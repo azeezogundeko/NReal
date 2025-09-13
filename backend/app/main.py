@@ -11,6 +11,7 @@ from app.db.models import DatabaseService
 from app.services.livekit.room_manager import PatternBRoomManager
 from app.services.profile_api import ProfileAPI
 from app.services.livekit.agent import LiveKitService
+from app.services.cache import start_cache_cleanup_service, stop_cache_cleanup_service
 
 from supabase import create_client
 
@@ -24,8 +25,10 @@ async def lifespan(app: FastAPI):
     # Initialize services
     settings = get_settings()
 
-    # Initialize Supabase client
-    supabase = create_client(settings.supabase_url, settings.supabase_key)
+    # Initialize Supabase client with service role key for backend operations
+    # Service role key bypasses RLS policies for server-side operations
+    supabase_key = settings.supabase_service_role_key #or settings.supabase_anon_key
+    supabase = create_client(settings.supabase_url, supabase_key)
     db_service = DatabaseService(supabase)
 
     # Create service instances with database support
@@ -38,11 +41,17 @@ async def lifespan(app: FastAPI):
     app.state.profile_api = profile_api
     app.state.livekit_service = livekit_service
     app.state.db_service = db_service
+    
+    # Start cache cleanup service
+    await start_cache_cleanup_service(room_manager)
+    print("Cache cleanup service started (10-minute intervals)")
 
     yield
 
     # Shutdown
     print("Translation Service API shutting down...")
+    await stop_cache_cleanup_service()
+    print("Cache cleanup service stopped")
 
 
 def create_application() -> FastAPI:
@@ -90,7 +99,7 @@ if __name__ == "__main__":
     settings = get_settings()
     uvicorn.run(
         "app.main:app",
-        host=settings.api_host,
+        # host=settings.api_host,
         port=settings.api_port,
         reload=settings.api_debug,
     )

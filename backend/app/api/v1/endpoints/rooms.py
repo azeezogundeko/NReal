@@ -4,18 +4,25 @@ Room management API endpoints.
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List
 
-from app.models.pydantic.rooms import (
+from app.models.pydantic_.rooms import (
     CreateRoomRequest,
     RoomInfoResponse,
     RoomListResponse
 )
 from app.services.livekit.room_manager import PatternBRoomManager
+from app.services.livekit.agent import LiveKitService
 
 
 def get_room_manager() -> PatternBRoomManager:
     """Dependency to get room manager."""
     from app.main import app
     return app.state.room_manager
+
+
+def get_livekit_service() -> LiveKitService:
+    """Dependency to get LiveKit service."""
+    from app.main import app
+    return app.state.livekit_service
 
 
 router = APIRouter()
@@ -30,8 +37,9 @@ async def create_room(
     try:
         room = await room_manager.create_room(request)
 
-        # Create a default profile for the host if they don't have one
+        # Create and cache profile for the host if they don't have one
         profile = await room_manager.get_user_profile(request.host_identity)
+        logging.info(f"Room created by {request.host_identity}, profile cached for 30 minutes")
 
         return {
             "success": True,
@@ -90,3 +98,108 @@ async def get_room(
         participant_count=room.participant_count,
         join_url=room.join_url
     )
+
+
+@router.get("/cache/stats")
+async def get_cache_stats(
+    room_manager: PatternBRoomManager = Depends(get_room_manager)
+):
+    """Get user profile cache statistics."""
+    try:
+        stats = room_manager.get_cache_stats()
+        return {
+            "success": True,
+            "cache_stats": stats
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/cache/cleanup")
+async def cleanup_cache(
+    room_manager: PatternBRoomManager = Depends(get_room_manager)
+):
+    """Manually trigger cache cleanup of expired entries."""
+    try:
+        initial_count = len(room_manager.user_profiles_cache)
+        room_manager._cleanup_expired_cache()
+        final_count = len(room_manager.user_profiles_cache)
+        cleaned_count = initial_count - final_count
+        
+        return {
+            "success": True,
+            "message": f"Cleaned up {cleaned_count} expired cache entries",
+            "initial_count": initial_count,
+            "final_count": final_count
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{room_name}/dispatch-agent")
+async def dispatch_agent_to_room(
+    room_name: str,
+    user_identity: str = None,
+    livekit_service: LiveKitService = Depends(get_livekit_service),
+    room_manager: PatternBRoomManager = Depends(get_room_manager)
+):
+    """Manually dispatch a translation agent to an existing room."""
+    try:
+        # Verify room exists
+        rooms = await room_manager.list_rooms()
+        room_found = None
+        for room in rooms:
+            if room.room_name == room_name:
+                room_found = room
+                break
+        
+        if not room_found:
+            raise HTTPException(status_code=404, detail=f"Room '{room_name}' not found")
+        
+        # Dispatch the agent
+        result = await livekit_service.dispatch_agent_to_room(room_name, user_identity)
+        
+        return {
+            "success": True,
+            "message": f"Translation agent dispatched to room '{room_name}'",
+            "dispatch_info": result
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to dispatch agent: {str(e)}")
+
+
+@router.get("/{room_name}/dispatches")
+async def list_room_dispatches(
+    room_name: str,
+    livekit_service: LiveKitService = Depends(get_livekit_service),
+    room_manager: PatternBRoomManager = Depends(get_room_manager)
+):
+    """List all agent dispatches for a room."""
+    try:
+        # Verify room exists
+        rooms = await room_manager.list_rooms()
+        room_found = None
+        for room in rooms:
+            if room.room_name == room_name:
+                room_found = room
+                break
+        
+        if not room_found:
+            raise HTTPException(status_code=404, detail=f"Room '{room_name}' not found")
+        
+        # Get dispatches
+        dispatches = await livekit_service.list_agent_dispatches(room_name)
+        
+        return {
+            "success": True,
+            "room_name": room_name,
+            "dispatches": dispatches
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to list dispatches: {str(e)}")

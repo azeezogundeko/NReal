@@ -3,7 +3,7 @@ LiveKit token generation API endpoints.
 """
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.models.pydantic.rooms import RoomJoinRequest
+from app.models.pydantic_.rooms import RoomJoinRequest
 from app.services.livekit.room_manager import PatternBRoomManager
 from app.services.livekit.agent import LiveKitService
 
@@ -46,13 +46,16 @@ async def generate_room_token(
     else:
         raise HTTPException(status_code=400, detail="room_name is required")
 
-    # Include user language in metadata for the room
+    # Get and cache user profile for the room
     profile = await room_manager.get_user_profile(request.user_identity)
     if not profile:
         raise HTTPException(status_code=404, detail="User profile not found")
+    
+    import logging
+    logging.info(f"User {request.user_identity} joining room {actual_room_name}, profile cached for 30 minutes")
 
     try:
-        token_data = livekit_service.generate_room_token(
+        token_data = await livekit_service.generate_room_token(
             request.user_identity,
             actual_room_name,
             request.user_metadata
