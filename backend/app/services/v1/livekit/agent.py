@@ -26,7 +26,8 @@ from livekit.plugins import spitch
 from app.core.config import get_settings
 from app.models.domain.profiles import UserLanguageProfile, SupportedLanguage
 from app.services.translation.service import TranslationService
-from app.services.livekit.room_manager import PatternBRoomManager
+from app.services.livekit.room_manager import PatternBRoomManager, RoomType
+from app.services.realtime.realtime_translation_agent import RealtimeTranslationService, RealtimeTranslationConfig
 
 
 class TranslationAgent(Agent):
@@ -136,12 +137,38 @@ class UserTranslationAgent:
         settings = get_settings()
         avatar = self.user_profile.preferred_voice_avatar
 
-        self.tts = deepgram.TTS(
-            api_key=settings.deepgram_api_key,
-            # voice=avatar.voice_id,
-            model=avatar.model,
-            # model="eleven_turbo_v2_5",
-        )
+        if avatar.provider == "deepgram":
+            self.tts = deepgram.TTS(
+                api_key=settings.deepgram_api_key,
+                model=avatar.model,
+            )
+        elif avatar.provider == "elevenlabs":
+            # Check if ElevenLabs is configured
+            if hasattr(settings, 'elevenlabs_api_key'):
+                from livekit.plugins import elevenlabs
+                self.tts = elevenlabs.TTS(
+                    api_key=settings.elevenlabs_api_key,
+                    voice=avatar.voice_id,
+                    model=avatar.model,
+                )
+            else:
+                # Fallback to Deepgram if ElevenLabs is not configured
+                self.tts = deepgram.TTS(
+                    api_key=settings.deepgram_api_key,
+                    model="aura-2-thalia-en",
+                )
+        elif avatar.provider == "openai":
+            self.tts = openai.TTS(
+                api_key=settings.openai_api_key,
+                voice=avatar.voice_id,
+                model=avatar.model,
+            )
+        else:
+            # Fallback to Deepgram with a default model for unsupported providers
+            self.tts = deepgram.TTS(
+                api_key=settings.deepgram_api_key,
+                model="aura-2-thalia-en",  # Use a known working Deepgram model
+            )
         # if avatar.provider == "deepgram":
         #     self.tts = deepgram.TTS(
         #         api_key=settings.deepgram_api_key,
@@ -370,39 +397,42 @@ class UserTranslationAgent:
             # chat_ctx=llm.ChatContext(),
         )
 
-        # Set up speech event handler
-        @self.session.on("user_speech_committed")
-        def on_user_speech_committed(ev):
-            """Handle speech from any participant"""
-            asyncio.create_task(self._handle_user_speech(ev))
+        # Set up speech event handler with CORRECT LiveKit event names
+        @self.session.on("user_input_transcribed")
+        def on_user_input_transcribed(event):
+            """Handle transcribed speech from any participant - CORRECT EVENT NAME"""
+            logging.info(f"🎤 User input transcribed: {event.transcript[:50]}... (speaker: {event.speaker_id})")
+            asyncio.create_task(self._handle_user_speech(event))
 
-        # Also set up additional event handlers for better integration
-        @self.session.on("user_started_speaking")
-        def on_user_started_speaking(ev):
-            """Track when a user starts speaking"""
-            participant_identity = self._extract_participant_identity(ev)
-            if participant_identity and self.translation_agent:
-                self.translation_agent.register_participant(
-                    participant_identity,
-                    self.participant_languages.get(participant_identity, SupportedLanguage.ENGLISH)
-                )
-                logging.debug(f"User started speaking: {participant_identity}")
+        # Set up state change handlers
+        @self.session.on("user_state_changed")
+        def on_user_state_changed(event):
+            """Track user state changes (speaking/listening/away)"""
+            logging.debug(f"👤 User state changed: {event.old_state} → {event.new_state}")
+            # Register participant when they start speaking
+            if event.new_state == "speaking":
+                participant_identity = getattr(event, 'participant_identity', None)
+                if participant_identity and self.translation_agent:
+                    self.translation_agent.register_participant(
+                        participant_identity,
+                        self.participant_languages.get(participant_identity, SupportedLanguage.ENGLISH)
+                    )
 
-        @self.session.on("user_stopped_speaking")
-        def on_user_stopped_speaking(ev):
-            """Track when a user stops speaking"""
-            participant_identity = self._extract_participant_identity(ev)
-            logging.debug(f"User stopped speaking: {participant_identity}")
+        @self.session.on("conversation_item_added")
+        def on_conversation_item_added(event):
+            """Track conversation items being added"""
+            logging.debug(f"💬 Conversation item added from {event.item.role}: {event.item.text_content[:50]}...")
 
         # Start the session with the custom agent
-        await self.session.start(room=self.room, agent=self.translation_agent)
+        await self.session.start(self.translation_agent, room=self.room)
         logging.info("AgentSession started successfully with TranslationAgent")
 
-    async def _handle_user_speech(self, ev):
-        """Handle speech from a participant using coordinated translation"""
+    async def _handle_user_speech(self, event):
+        """Handle transcribed speech from a participant using coordinated translation"""
         try:
-            user_message = ev.user_transcript
-            participant_identity = self._extract_participant_identity(ev)
+            # Extract data from the UserInputTranscribedEvent
+            user_message = event.transcript
+            participant_identity = event.speaker_id or self._extract_participant_identity(event)
 
             # Skip if this is our own speech or we can't identify the speaker
             if not participant_identity or participant_identity == self.user_profile.user_identity:
@@ -507,10 +537,20 @@ class UserTranslationAgent:
                 """Handle chat with translation logic"""
                 try:
                     # Get the latest user message
-                    if not chat_ctx.messages or chat_ctx.messages[-1].role != "user":
+                    if not chat_ctx.items or len(chat_ctx.items) == 0:
+                        return llm.ChatResponse(content="")
+                    
+                    # Find the last message item with user role
+                    last_user_message = None
+                    for item in reversed(chat_ctx.items):
+                        if item.type == "message" and item.role == "user":
+                            last_user_message = item
+                            break
+                    
+                    if not last_user_message:
                         return llm.ChatResponse(content="")
 
-                    user_message = chat_ctx.messages[-1].content
+                    user_message = last_user_message.content[0] if isinstance(last_user_message.content, list) else last_user_message.content
 
                     # Try to identify which participant spoke this message
                     speaker_identity = self._identify_speaker_from_message(user_message)
@@ -603,7 +643,7 @@ class UserTranslationAgent:
 
 
 class LiveKitService:
-    """Service for LiveKit operations."""
+    """Service for LiveKit operations with real-time translation support."""
 
     def __init__(self, room_manager: PatternBRoomManager):
         self.room_manager = room_manager
@@ -611,13 +651,72 @@ class LiveKitService:
         # Room-level agent registry: room_name -> {user_identity -> agent}
         self.room_agents: Dict[str, Dict[str, UserTranslationAgent]] = {}
         self._livekit_api = None
+        
+        # Real-time translation service for ultra-fast translation
+        self.realtime_translation_service = RealtimeTranslationService()
 
-    async def create_user_agent(self, user_identity: str, ctx: JobContext) -> UserTranslationAgent:
+    async def create_user_agent(self, user_identity: str, ctx: JobContext, use_realtime: bool = True) -> UserTranslationAgent:
         """Create and start a translation agent for a user"""
         profile = await self.room_manager.get_user_profile(user_identity)
         if not profile:
-            raise ValueError(f"No profile found for user {user_identity}")
+            # Try to create profile from job metadata
+            profile = await self._create_profile_from_metadata(user_identity, ctx)
+            if not profile:
+                raise ValueError(f"No profile found for user {user_identity} and cannot create from metadata")
 
+        room_name = ctx.room.name
+        
+        # Check if this is a translation room (2 users max)
+        is_translation_room = self._is_translation_room(room_name, ctx.room)
+        
+        if use_realtime and is_translation_room:
+            # Use the new real-time translation agent for optimal performance
+            return await self._create_realtime_agent(user_identity, profile, ctx)
+        else:
+            # Use the legacy agent for non-translation rooms or when realtime is disabled
+            return await self._create_legacy_agent(user_identity, profile, ctx)
+
+    async def _create_realtime_agent(self, user_identity: str, profile: UserLanguageProfile, ctx: JobContext):
+        """Create and start a real-time translation agent."""
+        try:
+            # Configure for ultra-fast translation
+            config = RealtimeTranslationConfig(
+                max_delay_ms=500,           # 500ms max delay as requested
+                interim_results=True,       # Process interim results
+                utterance_end_ms=500,      # Fast utterance detection  
+                enable_vad=True,           # Use VAD for better detection
+                audio_routing=True,        # Enable clean audio routing
+                confidence_threshold=0.7   # Lower threshold for speed
+            )
+            
+            # Create the real-time agent (fast operation)
+            realtime_agent = await asyncio.wait_for(
+                self.realtime_translation_service.create_agent(profile, config),
+                timeout=5.0
+            )
+            
+            # Start the agent (this might take longer, so separate timeout)
+            await asyncio.wait_for(
+                self.realtime_translation_service.start_agent(user_identity, ctx),
+                timeout=8.0
+            )
+            
+            logging.info(f"Created real-time translation agent for {user_identity}")
+            return realtime_agent
+            
+        except asyncio.TimeoutError:
+            logging.error(f"Real-time agent creation/start timed out for {user_identity}")
+            # Fallback to legacy agent
+            logging.info(f"Falling back to legacy agent for {user_identity}")
+            return await self._create_legacy_agent(user_identity, profile, ctx)
+        except Exception as e:
+            logging.error(f"Error creating real-time agent for {user_identity}: {e}")
+            # Fallback to legacy agent
+            logging.info(f"Falling back to legacy agent for {user_identity}")
+            return await self._create_legacy_agent(user_identity, profile, ctx)
+
+    async def _create_legacy_agent(self, user_identity: str, profile: UserLanguageProfile, ctx: JobContext):
+        """Create and start a legacy translation agent."""
         # Pass the service reference to enable agent coordination
         agent = UserTranslationAgent(profile, livekit_service=self)
         await agent.start(ctx)
@@ -632,7 +731,64 @@ class LiveKitService:
         # Notify existing agents in the room about the new agent
         await self._notify_agents_of_new_agent(room_name, agent)
 
+        logging.info(f"Created legacy translation agent for {user_identity}")
         return agent
+
+    async def _create_profile_from_metadata(self, user_identity: str, ctx: JobContext) -> Optional[UserLanguageProfile]:
+        """Create a user profile from job metadata if available."""
+        try:
+            if not ctx.job.metadata:
+                return None
+                
+            metadata = json.loads(ctx.job.metadata)
+            
+            # Extract language from metadata
+            native_language_code = metadata.get("native_language", "en")
+            try:
+                native_language = SupportedLanguage(native_language_code)
+            except ValueError:
+                logging.warning(f"Unsupported language code: {native_language_code}, defaulting to English")
+                native_language = SupportedLanguage.ENGLISH
+            
+            # Get default voice avatar for the language
+            from app.models.domain.profiles import VOICE_AVATARS
+            avatars = VOICE_AVATARS.get(native_language.value, VOICE_AVATARS["en"])
+            default_avatar = avatars[0] if avatars else None
+            
+            if not default_avatar:
+                logging.error(f"No voice avatar available for language: {native_language.value}")
+                return None
+            
+            # Create the profile
+            profile = UserLanguageProfile(
+                user_identity=user_identity,
+                native_language=native_language,
+                preferred_voice_avatar=default_avatar,
+                translation_preferences=metadata.get("translation_preferences", {"formal_tone": False, "preserve_emotion": True})
+            )
+            
+            # Save to database
+            await self.room_manager.create_user_profile(profile)
+            logging.info(f"Created user profile for {user_identity} with language {native_language.value}")
+            
+            return profile
+            
+        except Exception as e:
+            logging.error(f"Error creating profile from metadata for {user_identity}: {e}")
+            return None
+
+    def _is_translation_room(self, room_name: str, room: rtc.Room) -> bool:
+        """Check if this is a translation room (2-user simultaneous interpretation)."""
+        # Check room name pattern
+        if "translation" in room_name.lower():
+            return True
+        
+        # Check participant count (translation rooms are limited to 2)
+        total_participants = len(room.remote_participants) + (1 if room.local_participant else 0)
+        if total_participants <= 2:
+            return True
+        
+        return False
 
     def remove_user_agent(self, user_identity: str):
         """Clean up user agent"""
@@ -709,7 +865,7 @@ class LiveKitService:
             )
         return self._livekit_api
 
-    async def dispatch_agent_to_room(self, room_name: str, user_identity: str = None) -> dict:
+    async def dispatch_agent_to_room(self, room_name: str, user_identity: str = None, agent_name: str = None) -> dict:
         """Manually dispatch a translation agent to an existing room"""
         try:
             lkapi = self._get_livekit_api()
@@ -736,7 +892,7 @@ class LiveKitService:
             
             # Create the dispatch request
             dispatch_request = api.CreateAgentDispatchRequest(
-                agent_name="translation-agent",
+                agent_name=agent_name,
                 room=room_name,
                 metadata=json.dumps(agent_metadata)
             )
@@ -798,7 +954,7 @@ class LiveKitService:
         room_config = api.RoomConfiguration(
             agents=[
                 api.RoomAgentDispatch(
-                    agent_name="translation-agent",
+                    # agent_name="translation-agent",
                     metadata=json.dumps(agent_metadata)
                 )
             ]
@@ -819,7 +975,7 @@ class LiveKitService:
         # Add user metadata as well
         if metadata:
             token = token.with_metadata(json.dumps(metadata))
-
+        # print(token.value)
         return {
             "token": token.to_jwt(),
             "ws_url": settings.livekit_url,

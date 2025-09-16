@@ -6,6 +6,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.router import api_router
+from app.api.realtime_translation import router as realtime_router
+from app.api.translation_rooms import router as translation_rooms_router
 from app.core.config import get_settings
 from app.db.models import DatabaseService
 from app.services.livekit.room_manager import PatternBRoomManager
@@ -76,6 +78,8 @@ def create_application() -> FastAPI:
 
     # Include API routes
     app.include_router(api_router, prefix="/api")
+    app.include_router(realtime_router, prefix="/api")
+    app.include_router(translation_rooms_router, prefix="/api")
 
     # Health check endpoint
     @app.get("/")

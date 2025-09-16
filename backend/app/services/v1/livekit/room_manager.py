@@ -1,12 +1,21 @@
 """
 LiveKit room management service with Supabase persistence.
+Enhanced with real-time translation support.
 """
 import time
 from typing import Dict, Optional, NamedTuple
+from enum import Enum
 
 from app.db.models import DatabaseService, UserProfile, Room
 from app.models.domain.profiles import UserLanguageProfile, SupportedLanguage, VoiceAvatar, VOICE_AVATARS
 from app.models.domain.rooms import RoomCreateRequest
+
+
+class RoomType(Enum):
+    """Types of rooms supported."""
+    GENERAL = "general"
+    TRANSLATION = "translation"  # 2-user real-time translation
+    CONFERENCE = "conference"    # Multi-user conference
 
 
 class CachedUserProfile(NamedTuple):
@@ -161,30 +170,99 @@ class PatternBRoomManager:
 
         return default_profile
 
-    async def create_room(self, request: RoomCreateRequest) -> Room:
-        """Create a new room in database."""
+    async def create_user_profile(self, profile: UserLanguageProfile) -> UserLanguageProfile:
+        """Create and save a user profile."""
+        # Save to database
+        db_profile = UserProfile(
+            user_identity=profile.user_identity,
+            native_language=profile.native_language.value,
+            voice_avatar_id=profile.preferred_voice_avatar.voice_id,
+            voice_provider=profile.preferred_voice_avatar.provider,
+            formal_tone=profile.translation_preferences.get("formal_tone", False),
+            preserve_emotion=profile.translation_preferences.get("preserve_emotion", True),
+        )
+
+        try:
+            await self.db.create_user_profile(db_profile)
+            # Cache the profile with TTL
+            self.cache_user_profile(profile)
+            import logging
+            logging.info(f"Created and cached profile for {profile.user_identity}")
+        except Exception as e:
+            # If database fails, still cache the profile
+            self.cache_user_profile(profile)
+            import logging
+            logging.warning(f"Database save failed for profile {profile.user_identity}, but cached: {e}")
+
+        return profile
+
+    async def create_room(self, request: RoomCreateRequest, room_type: RoomType = RoomType.GENERAL) -> Room:
+        """Create a new room in database with type specification."""
         from datetime import datetime
         import uuid
 
         room_id = str(uuid.uuid4())
-        room_name = request.room_name or f"Meeting-{room_id[:8]}"
+        
+        # Generate room name based on type
+        if room_type == RoomType.TRANSLATION:
+            room_name = request.room_name or f"Translation-{room_id[:8]}"
+        elif room_type == RoomType.CONFERENCE:
+            room_name = request.room_name or f"Conference-{room_id[:8]}"
+        else:
+            room_name = request.room_name or f"Meeting-{room_id[:8]}"
+
+        # Set max participants based on room type
+        if room_type == RoomType.TRANSLATION:
+            max_participants = min(request.max_participants or 2, 2)  # Force 2 for translation
+        else:
+            max_participants = request.max_participants
 
         # Create room in database
         db_room = Room(
             room_id=room_id,
             room_name=room_name,
             host_identity=request.host_identity,
-            max_participants=request.max_participants,
+            max_participants=max_participants,
             is_active=True,
         )
 
         created_room = await self.db.create_room(db_room)
         created_room.join_url = f"/join/{created_room.room_id}"
+        created_room.room_type = room_type.value  # Add room type info
         return created_room
+
+    async def create_translation_room(self, 
+                                    host_identity: str,
+                                    participant_b_identity: str,
+                                    room_name: Optional[str] = None) -> Room:
+        """Create a specialized 2-user translation room."""
+        import uuid
+        
+        room_id = str(uuid.uuid4())
+        final_room_name = room_name or f"Translation-{host_identity}-{participant_b_identity}"
+        
+        # Create room request
+        request = RoomCreateRequest(
+            room_name=final_room_name,
+            host_identity=host_identity,
+            max_participants=2  # Exactly 2 participants for translation
+        )
+        
+        # Create the room with translation type
+        room = await self.create_room(request, RoomType.TRANSLATION)
+        
+        import logging
+        logging.info(f"Created translation room {room.room_id} for {host_identity} <-> {participant_b_identity}")
+        
+        return room
 
     async def get_room(self, room_id: str) -> Optional[Room]:
         """Get room by ID from database."""
         return await self.db.get_room(room_id)
+
+    async def get_room_by_name(self, room_name: str) -> Optional[Room]:
+        """Get room by name from database."""
+        return await self.db.get_room_by_name(room_name)
 
     async def list_rooms(self) -> list[Room]:
         """List all active rooms from database."""

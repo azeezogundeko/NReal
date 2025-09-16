@@ -153,6 +153,23 @@ class DatabaseService:
             )
         return None
 
+    async def get_room_by_name(self, room_name: str) -> Optional[Room]:
+        """Get room by room_name."""
+        result = self.supabase.table("rooms").select("*").eq("room_name", room_name).eq("is_active", True).execute()
+        if result.data:
+            room_data = result.data[0]
+            return Room(
+                id=room_data["id"],
+                room_id=room_data["room_id"],
+                room_name=room_data["room_name"],
+                host_identity=room_data["host_identity"],
+                max_participants=room_data["max_participants"],
+                is_active=room_data["is_active"],
+                created_at=room_data["created_at"],
+                updated_at=room_data["updated_at"],
+            )
+        return None
+
     async def list_active_rooms(self) -> list[Room]:
         """List all active rooms."""
         result = self.supabase.table("rooms").select("*").eq("is_active", True).execute()

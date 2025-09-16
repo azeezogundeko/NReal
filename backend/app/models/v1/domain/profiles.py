@@ -41,24 +41,6 @@ class UserLanguageProfile:
 VOICE_AVATARS = {
     "en": [
         VoiceAvatar(
-            voice_id="21m00Tcm4TlvDq8ikWAM",  # Rachel
-            provider="elevenlabs",
-            model="eleven_turbo_v2_5",
-            name="Rachel",
-            gender="female",
-            accent="american",
-            description="Warm and professional female voice"
-        ),
-        VoiceAvatar(
-            voice_id="29vD33N1CtxCmqQRPOHJ",  # Drew
-            provider="elevenlabs",
-            model="eleven_turbo_v2_5",
-            name="Drew",
-            gender="male",
-            accent="american",
-            description="Confident and clear male voice"
-        ),
-        VoiceAvatar(
             voice_id="aura-2-thalia-en",
             provider="deepgram",
             model="aura-2-thalia-en",
@@ -75,6 +57,24 @@ VOICE_AVATARS = {
             gender="male",
             accent="american",
             description="Confident, comfortable, casual voice"
+        ),
+        VoiceAvatar(
+            voice_id="21m00Tcm4TlvDq8ikWAM",  # Rachel
+            provider="elevenlabs",
+            model="eleven_turbo_v2_5",
+            name="Rachel",
+            gender="female",
+            accent="american",
+            description="Warm and professional female voice"
+        ),
+        VoiceAvatar(
+            voice_id="29vD33N1CtxCmqQRPOHJ",  # Drew
+            provider="elevenlabs",
+            model="eleven_turbo_v2_5",
+            name="Drew",
+            gender="male",
+            accent="american",
+            description="Confident and clear male voice"
         ),
         VoiceAvatar(
             voice_id="John",

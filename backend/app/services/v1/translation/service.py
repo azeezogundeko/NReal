@@ -54,8 +54,8 @@ class TranslationService:
         """
 
         chat_ctx = llm.ChatContext()
-        chat_ctx.messages.append(llm.ChatMessage(role="system", content=system_prompt))
-        chat_ctx.messages.append(llm.ChatMessage(role="user", content=text))
+        chat_ctx.add_message(role="system", content=system_prompt)
+        chat_ctx.add_message(role="user", content=text)
 
         response = await self.llm.chat(chat_ctx=chat_ctx)
         return response.content.strip()

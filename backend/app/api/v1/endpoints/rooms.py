@@ -9,7 +9,7 @@ from app.models.pydantic_.rooms import (
     RoomInfoResponse,
     RoomListResponse
 )
-from app.services.livekit.room_manager import PatternBRoomManager
+from app.services.livekit.room_manager import PatternBRoomManager, RoomType
 from app.services.livekit.agent import LiveKitService
 
 
@@ -31,11 +31,19 @@ router = APIRouter()
 @router.post("/")
 async def create_room(
     request: CreateRoomRequest,
+    room_type: str = "general",  # New parameter for room type
     room_manager: PatternBRoomManager = Depends(get_room_manager)
 ):
     """Create a new meeting room."""
+    import logging
     try:
-        room = await room_manager.create_room(request)
+        # Convert room type string to enum
+        try:
+            room_type_enum = RoomType(room_type.lower())
+        except ValueError:
+            room_type_enum = RoomType.GENERAL
+        
+        room = await room_manager.create_room(request, room_type_enum)
 
         # Create and cache profile for the host if they don't have one
         profile = await room_manager.get_user_profile(request.host_identity)
@@ -46,7 +54,9 @@ async def create_room(
             "room": {
                 "room_id": room.room_id,
                 "room_name": room.room_name,
+                "room_type": room_type_enum.value,
                 "join_url": room.join_url,
+                "max_participants": room.max_participants,
                 "host_profile": {
                     "user_identity": profile.user_identity if profile else request.host_identity,
                     "native_language": profile.native_language.value if profile else "en",
@@ -139,6 +149,7 @@ async def cleanup_cache(
 @router.post("/{room_name}/dispatch-agent")
 async def dispatch_agent_to_room(
     room_name: str,
+    agent_name: str,
     user_identity: str = None,
     livekit_service: LiveKitService = Depends(get_livekit_service),
     room_manager: PatternBRoomManager = Depends(get_room_manager)
@@ -157,7 +168,7 @@ async def dispatch_agent_to_room(
             raise HTTPException(status_code=404, detail=f"Room '{room_name}' not found")
         
         # Dispatch the agent
-        result = await livekit_service.dispatch_agent_to_room(room_name, user_identity)
+        result = await livekit_service.dispatch_agent_to_room(room_name, user_identity, agent_name)
         
         return {
             "success": True,

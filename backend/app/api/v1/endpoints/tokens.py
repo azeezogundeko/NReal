@@ -55,10 +55,19 @@ async def generate_room_token(
     logging.info(f"User {request.user_identity} joining room {actual_room_name}, profile cached for 30 minutes")
 
     try:
+        # Add real-time translation metadata if this is a translation room
+        enhanced_metadata = request.user_metadata or {}
+        if "translation" in actual_room_name.lower():
+            enhanced_metadata.update({
+                "room_type": "translation",
+                "use_realtime": True,
+                "language": enhanced_metadata.get("language", profile.native_language.value)
+            })
+        
         token_data = await livekit_service.generate_room_token(
             request.user_identity,
             actual_room_name,
-            request.user_metadata
+            enhanced_metadata
         )
         return token_data
     except ValueError as e:

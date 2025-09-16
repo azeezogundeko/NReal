@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
 """
-Script to run the LiveKit Agents worker for translation services.
-This worker handles agent dispatch for real-time translation.
+Simple script to run ONLY the LiveKit Agents worker.
+Use this to test agent functionality separately from the API server.
 """
-import os
-import sys
 import logging
+import sys
 from pathlib import Path
 
 # Add the backend directory to Python path
-backend_dir = Path(__file__).parent.parent
-sys.path.insert(0, str(backend_dir))
+sys.path.insert(0, str(Path(__file__).parent))
 
 # Set up logging
 logging.basicConfig(
@@ -21,12 +19,14 @@ logging.basicConfig(
 def main():
     """Run the LiveKit Agents worker."""
     try:
-        # Import the worker entrypoint
+        # Import after path setup
         from agents.worker_entrypoint import cli, WorkerOptions, entrypoint
         
-        logging.info("🚀 Starting LiveKit Agents Worker for Translation Services")
-        logging.info("   - Agent Name: translation-agent")
-        logging.info("   - Entrypoint: worker_entrypoint.entrypoint")
+        print("🤖 Starting LiveKit Agents Worker for Translation Services")
+        print("   - Agent Name: translation-agent")
+        print("   - Ready to handle agent dispatches")
+        print("   - Press Ctrl+C to stop")
+        print("")
         
         # Run the worker
         cli.run_app(
@@ -37,10 +37,12 @@ def main():
         )
         
     except KeyboardInterrupt:
-        logging.info("👋 Worker stopped by user")
+        print("\n👋 Worker stopped by user")
     except Exception as e:
-        logging.error(f"❌ Worker failed: {e}")
+        print(f"❌ Worker failed: {e}")
         raise
 
 if __name__ == "__main__":
     main()
+
+
