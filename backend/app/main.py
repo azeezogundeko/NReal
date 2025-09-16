@@ -6,14 +6,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.router import api_router
-from app.api.realtime_translation import router as realtime_router
-from app.api.translation_rooms import router as translation_rooms_router
+from app.api.v1.realtime_translation import router as realtime_router
+from app.api.v1.translation_rooms import router as translation_rooms_router
 from app.core.config import get_settings
-from app.db.models import DatabaseService
-from app.services.livekit.room_manager import PatternBRoomManager
+from app.db.v1.models import DatabaseService
+from app.services.v1.livekit.room_manager import PatternBRoomManager
 from app.services.profile_api import ProfileAPI
-from app.services.livekit.agent import LiveKitService
-from app.services.cache import start_cache_cleanup_service, stop_cache_cleanup_service
+from app.services.v1.livekit.agent import LiveKitService
+from app.services.v1.cache import start_cache_cleanup_service, stop_cache_cleanup_service
 
 from supabase import create_client
 

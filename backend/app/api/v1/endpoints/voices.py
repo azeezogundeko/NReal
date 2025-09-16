@@ -5,7 +5,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends
 
 from app.services.profile_api import ProfileAPI
-from app.services.livekit.room_manager import PatternBRoomManager
+from app.services.v1.livekit.room_manager import PatternBRoomManager
 
 
 def get_profile_api(room_manager: PatternBRoomManager = Depends(lambda: None)) -> ProfileAPI:

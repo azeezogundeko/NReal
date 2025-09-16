@@ -6,11 +6,11 @@ from typing import Optional, Dict, Any
 import logging
 
 from app.core.config import get_settings
-from app.db.models import DatabaseService
-from app.services.livekit.room_manager import PatternBRoomManager, RoomType
-from app.services.livekit.agent import LiveKitService
-from app.models.domain.profiles import SupportedLanguage, UserLanguageProfile
-from app.models.domain.rooms import RoomCreateRequest
+from app.db.v1.models import DatabaseService
+from app.services.v1.livekit.room_manager import PatternBRoomManager, RoomType
+from app.services.v1.livekit.agent import LiveKitService
+from app.models.v1.domain.profiles import SupportedLanguage, UserLanguageProfile
+from app.models.v1.domain.rooms import RoomCreateRequest
 
 router = APIRouter(prefix="/realtime-translation", tags=["realtime-translation"])
 

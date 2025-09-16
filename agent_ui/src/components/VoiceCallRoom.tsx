@@ -18,13 +18,15 @@ interface VoiceCallRoomProps {
   userLanguage: string;
   userAvatar: string;
   roomId: string;
+  isTranslationMode?: boolean;
 }
 
 const VoiceCallRoom: React.FC<VoiceCallRoomProps> = ({
   userName,
   userLanguage,
   userAvatar,
-  roomId
+  roomId,
+  isTranslationMode = false
 }) => {
   const participants = useParticipants();
   const { localParticipant } = useLocalParticipant();
@@ -225,6 +227,27 @@ const VoiceCallRoom: React.FC<VoiceCallRoomProps> = ({
                   </div>
                 </div>
               </div>
+
+              {/* Translation Mode Indicator */}
+              {(isTranslationMode || roomId.toLowerCase().includes('translation')) && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-gradient-to-r from-green-900/30 to-blue-900/30 border border-green-500/30 rounded-lg p-4 mt-4"
+                >
+                  <div className="flex items-center mb-2">
+                    <span className="text-2xl mr-2">🌐</span>
+                    <h3 className="text-lg font-semibold text-green-300">Real-Time Translation Room</h3>
+                  </div>
+                  <ul className="text-sm text-green-200 space-y-1">
+                    <li>• Ultra-fast translation (500ms max delay)</li>
+                    <li>• No audio pollution - clean routing</li>
+                    <li>• Speak naturally - translation is automatic</li>
+                    <li>• Maximum 2 participants for optimal performance</li>
+                    <li>• Each person hears the other in their own language</li>
+                  </ul>
+                </motion.div>
+              )}
             </motion.div>
           ) : (
             // Active conversation view

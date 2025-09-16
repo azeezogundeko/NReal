@@ -24,10 +24,10 @@ from livekit.plugins import openai, deepgram, silero
 from livekit.plugins import spitch
 
 from app.core.config import get_settings
-from app.models.domain.profiles import UserLanguageProfile, SupportedLanguage
-from app.services.translation.service import TranslationService
-from app.services.livekit.room_manager import PatternBRoomManager, RoomType
-from app.services.realtime.realtime_translation_agent import RealtimeTranslationService, RealtimeTranslationConfig
+from app.models.v1.domain.profiles import UserLanguageProfile, SupportedLanguage
+from app.services.v1.translation.service import TranslationService
+from app.services.v1.livekit.room_manager import PatternBRoomManager, RoomType
+from app.services.v1.realtime.realtime_translation_agent import RealtimeTranslationService, RealtimeTranslationConfig
 
 
 class TranslationAgent(Agent):

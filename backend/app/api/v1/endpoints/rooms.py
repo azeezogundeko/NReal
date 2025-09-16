@@ -4,13 +4,13 @@ Room management API endpoints.
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List
 
-from app.models.pydantic_.rooms import (
+from app.models.v1.pydantic_.rooms import (
     CreateRoomRequest,
     RoomInfoResponse,
     RoomListResponse
 )
-from app.services.livekit.room_manager import PatternBRoomManager, RoomType
-from app.services.livekit.agent import LiveKitService
+from app.services.v1.livekit.room_manager import PatternBRoomManager, RoomType
+from app.services.v1.livekit.agent import LiveKitService
 
 
 def get_room_manager() -> PatternBRoomManager:

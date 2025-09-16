@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import LanguageSelector from '../components/LanguageSelector';
 import AvatarSelector from '../components/AvatarSelector';
+import TranslationRoomSetup from '../components/TranslationRoomSetup';
 import { apiService } from '../services/api';
 
 // Import the avatar data from the component
@@ -16,6 +17,7 @@ const HomePage: React.FC = () => {
   const [selectedAvatar, setSelectedAvatar] = useState('rachel');
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
   const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
+  const [isTranslationModalOpen, setIsTranslationModalOpen] = useState(false);
 
   // Update selected avatar when language changes
   useEffect(() => {
@@ -230,6 +232,19 @@ const HomePage: React.FC = () => {
                 </>
               )}
             </motion.button>
+
+            {/* Translation Room */}
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => setIsTranslationModalOpen(true)}
+              className="w-full py-2.5 bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700 text-white font-medium rounded-lg transition-all duration-200 flex items-center justify-center"
+            >
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+              </svg>
+              🌐 Create Translation Room
+            </motion.button>
           </div>
         </motion.div>
 
@@ -251,7 +266,7 @@ const HomePage: React.FC = () => {
               <svg className="w-4 h-4 mr-2 text-primary-500" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M7 2a1 1 0 011 1v1h3a1 1 0 110 2H9.578a18.87 18.87 0 01-1.724 4.78c.29.354.596.696.914 1.026a1 1 0 11-1.44 1.389c-.188-.196-.373-.396-.554-.6a19.098 19.098 0 01-3.107 3.567 1 1 0 01-1.334-1.49 17.087 17.087 0 003.13-3.733 18.992 18.992 0 01-1.487-2.494 1 1 0 111.79-.89c.234.47.489.928.764 1.372.417-.934.752-1.913.997-2.927H3a1 1 0 110-2h3V3a1 1 0 011-1zm6 6a1 1 0 01.894.553l2.991 5.982a.869.869 0 01.02.037l.99 1.98a1 1 0 11-1.79.895L15.383 16h-4.764l-.724 1.447a1 1 0 11-1.788-.894l.99-1.98.019-.038 2.99-5.982A1 1 0 0113 8zm-1.382 6h2.764L13 11.236 11.618 14z" clipRule="evenodd" />
               </svg>
-              Live Translation
+              500ms Translation
             </div>
             <div className="flex items-center justify-center">
               <svg className="w-4 h-4 mr-2 text-primary-500" fill="currentColor" viewBox="0 0 20 20">
@@ -362,6 +377,13 @@ const HomePage: React.FC = () => {
             </div>
           </motion.div>
         </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Translation Room Modal */}
+      <AnimatePresence>
+        {isTranslationModalOpen && (
+          <TranslationRoomSetup onClose={() => setIsTranslationModalOpen(false)} />
         )}
       </AnimatePresence>
     </div>

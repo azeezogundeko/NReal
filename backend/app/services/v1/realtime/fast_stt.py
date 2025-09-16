@@ -12,7 +12,7 @@ import uuid
 from livekit.agents import stt
 from livekit.plugins import deepgram, openai
 from app.core.config import get_settings
-from app.models.domain.profiles import SupportedLanguage
+from app.models.v1.domain.profiles import SupportedLanguage
 
 
 class STTProvider(Enum):

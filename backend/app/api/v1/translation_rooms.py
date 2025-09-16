@@ -6,10 +6,10 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 
-from app.db.models import DatabaseService
-from app.services.livekit.room_manager import PatternBRoomManager
-from app.services.livekit.agent import LiveKitService
-from app.models.domain.profiles import SupportedLanguage, UserLanguageProfile, VOICE_AVATARS
+from app.db.v1.models import DatabaseService
+from app.services.v1.livekit.room_manager import PatternBRoomManager
+from app.services.v1.livekit.agent import LiveKitService
+from app.models.v1.domain.profiles import SupportedLanguage, UserLanguageProfile, VOICE_AVATARS
 from app.core.dependencies import get_room_manager, get_livekit_service
 
 

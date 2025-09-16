@@ -3,14 +3,14 @@ Profile API service for managing user language profiles with Supabase persistenc
 """
 from typing import Dict, List, Optional
 
-from app.db.models import DatabaseService, UserProfile
-from app.models.domain.profiles import (
+from app.db.v1.models import DatabaseService, UserProfile
+from app.models.v1.domain.profiles import (
     SupportedLanguage,
     UserLanguageProfile,
     VoiceAvatar,
     VOICE_AVATARS
 )
-from app.services.livekit.room_manager import PatternBRoomManager
+from app.services.v1.livekit.room_manager import PatternBRoomManager
 
 
 class ProfileAPI:

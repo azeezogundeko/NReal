@@ -6,9 +6,9 @@ import time
 from typing import Dict, Optional, NamedTuple
 from enum import Enum
 
-from app.db.models import DatabaseService, UserProfile, Room
-from app.models.domain.profiles import UserLanguageProfile, SupportedLanguage, VoiceAvatar, VOICE_AVATARS
-from app.models.domain.rooms import RoomCreateRequest
+from app.db.v1.models import DatabaseService, UserProfile, Room
+from app.models.v1.domain.profiles import UserLanguageProfile, SupportedLanguage, VoiceAvatar, VOICE_AVATARS
+from app.models.v1.domain.rooms import RoomCreateRequest
 
 
 class RoomType(Enum):

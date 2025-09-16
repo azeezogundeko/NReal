@@ -4,13 +4,13 @@ Profile management API endpoints.
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.models.pydantic_.profiles import (
+from app.models.v1.pydantic_.profiles import (
     CreateProfileRequest,
     UpdateVoiceRequest,
     UserProfileResponse
 )
 from app.services.profile_api import ProfileAPI
-from app.services.livekit.room_manager import PatternBRoomManager
+from app.services.v1.livekit.room_manager import PatternBRoomManager
 
 
 def get_profile_api() -> ProfileAPI:

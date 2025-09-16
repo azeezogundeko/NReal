@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { Room } from 'livekit-client';
 import { RoomContext } from '@livekit/components-react';
@@ -40,56 +40,83 @@ const RoomPage: React.FC = () => {
   
   const [isConnecting, setIsConnecting] = useState(true);
   const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [showLanguageSelector, setShowLanguageSelector] = useState(false);
   
-  // Get user configuration from URL params
+  // Get user configuration from URL params or translation room data
   const userName = searchParams.get('userName') || 'Anonymous';
   const userLanguage = searchParams.get('language') || 'en';
   const userAvatar = searchParams.get('avatar') || 'default';
+  const isTranslationMode = searchParams.get('translationMode') === 'true';
+  
+  const [selectedLanguage, setSelectedLanguage] = useState(userLanguage);
 
-
-  useEffect(() => {
-    if (!roomId) {
-      navigate('/');
-      return;
-    }
-
-    const connectToRoom = async () => {
+  const connectToRoom = useCallback(async (finalLanguage?: string) => {
       try {
         setIsConnecting(true);
         setConnectionError(null);
 
-        // First, ensure user profile exists
-        await apiService.getOrCreateUserProfile(userName, userLanguage, userAvatar);
-        
-        // Create or ensure room exists in backend
-        try {
-          await apiService.createRoom({
-            host_identity: userName,
-            room_name: roomId,
-            max_participants: 50
-          });
-          console.log('Room created or already exists:', roomId);
-        } catch (roomError: any) {
-          // Room might already exist, that's okay
-          console.log('Room creation info:', roomError?.message || 'Room may already exist');
-        }
-        
-        // Generate token and get server URL from backend
-        const tokenResponse = await apiService.generateToken({
-          user_identity: userName,
-          room_name: roomId,
-          user_metadata: {
-            name: userName,
-            language: userLanguage,
-            avatar: userAvatar,
-          }
-        });
-        
-        const serverUrl = tokenResponse.ws_url;
-        const token = tokenResponse.token;
+        const languageToUse = finalLanguage || selectedLanguage || userLanguage;
 
-        await room.connect(serverUrl, token);
-        console.log('Connected to room:', roomId);
+        // Check if this is a translation room with pre-generated tokens
+        const translationRoomData = sessionStorage.getItem('translationRoomData');
+        
+        if (isTranslationMode && translationRoomData) {
+          // Use pre-generated token for translation room
+          const roomData = JSON.parse(translationRoomData);
+          console.log('Using translation room data:', roomData);
+          
+          await room.connect(roomData.wsUrl, roomData.token);
+          console.log('Connected to translation room:', roomId);
+          
+          // Clear the session data after use
+          sessionStorage.removeItem('translationRoomData');
+        } else {
+          // Check if this is a translation room by checking the room name
+          const isTranslationRoom = roomId ? roomId.toLowerCase().includes('translation') : false;
+          
+          if (isTranslationRoom && !isTranslationMode && !finalLanguage) {
+            // This is a translation room but user hasn't selected language yet
+            setShowLanguageSelector(true);
+            setIsConnecting(false);
+            return;
+          }
+
+          // Standard room connection flow
+          // First, ensure user profile exists
+          await apiService.getOrCreateUserProfile(userName, languageToUse, userAvatar);
+          
+          // Create or ensure room exists in backend
+          try {
+            await apiService.createRoom({
+              host_identity: userName,
+              room_name: roomId || '',
+              max_participants: isTranslationRoom ? 2 : 50,
+              room_type: isTranslationRoom ? 'translation' : 'general'
+            });
+            console.log('Room created or already exists:', roomId);
+          } catch (roomError: any) {
+            // Room might already exist, that's okay
+            console.log('Room creation info:', roomError?.message || 'Room may already exist');
+          }
+          
+          // Generate token and get server URL from backend
+          const tokenResponse = await apiService.generateToken({
+            user_identity: userName,
+            room_name: roomId || '',
+            user_metadata: {
+              name: userName,
+              language: languageToUse,
+              avatar: userAvatar,
+              room_type: isTranslationRoom ? 'translation' : 'general'
+            }
+          });
+          
+          const serverUrl = tokenResponse.ws_url;
+          const token = tokenResponse.token;
+
+          await room.connect(serverUrl, token);
+          console.log('Connected to room:', roomId);
+        }
         
         // Note: Translation agent is automatically dispatched via token generation
         // No need to manually dispatch here as it's handled by RoomAgentDispatch in the token
@@ -134,14 +161,20 @@ const RoomPage: React.FC = () => {
         setConnectionError('Failed to connect to room. Please try again.');
         setIsConnecting(false);
       }
-    };
+    }, [selectedLanguage, userLanguage, userName, userAvatar, roomId, isTranslationMode, room, setShowLanguageSelector, setIsConnecting, setConnectionError, navigate]);
+
+  useEffect(() => {
+    if (!roomId) {
+      navigate('/');
+      return;
+    }
 
     connectToRoom();
 
     return () => {
       room.disconnect();
     };
-  }, [roomId, userName, userLanguage, userAvatar, navigate]);
+  }, [roomId, navigate, connectToRoom]);
 
 
   const handleLeaveRoom = () => {
@@ -331,9 +364,82 @@ const RoomPage: React.FC = () => {
             userLanguage={userLanguage}
             userAvatar={userAvatar}
             roomId={roomId || ''}
+            isTranslationMode={isTranslationMode}
           />
         </div>
       </RoomContext.Provider>
+
+      {/* Language Selection Modal for Translation Rooms */}
+      {showLanguageSelector && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-gray-900 rounded-2xl p-8 max-w-md w-full border border-gray-700"
+          >
+            <h2 className="text-2xl font-bold text-white mb-4 text-center">
+              🌐 Translation Room
+            </h2>
+            <p className="text-gray-300 mb-6 text-center">
+              This is a real-time translation room. Please select your language to enable automatic translation.
+            </p>
+
+            <div className="space-y-4">
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Your Language
+              </label>
+              <select
+                value={selectedLanguage}
+                onChange={(e) => setSelectedLanguage(e.target.value)}
+                className="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-3 text-white focus:border-blue-500 focus:outline-none"
+              >
+                <option value="en">🇺🇸 English</option>
+                <option value="es">🇪🇸 Spanish</option>
+                <option value="fr">🇫🇷 French</option>
+                <option value="de">🇩🇪 German</option>
+              </select>
+
+              <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
+                <h4 className="font-semibold text-blue-300 mb-2">How it works:</h4>
+                <ul className="text-sm text-blue-200 space-y-1">
+                  <li>• You speak in your language</li>
+                  <li>• Others hear you in their language</li>
+                  <li>• They speak in their language</li>
+                  <li>• You hear them in your language</li>
+                  <li>• 500ms max delay, no audio pollution</li>
+                </ul>
+              </div>
+
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => {
+                    setShowLanguageSelector(false);
+                    navigate('/');
+                  }}
+                  className="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-3 rounded-lg font-medium transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    setShowLanguageSelector(false);
+                    // Update the URL to include translation mode
+                    const params = new URLSearchParams(searchParams);
+                    params.set('language', selectedLanguage);
+                    params.set('translationMode', 'true');
+                    window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
+                    
+                    await connectToRoom(selectedLanguage);
+                  }}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-medium transition-colors"
+                >
+                  Join Translation Room
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 };

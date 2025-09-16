@@ -22,11 +22,11 @@ from livekit.agents import (
 from livekit.plugins import deepgram, silero
 
 from app.core.config import get_settings
-from app.models.domain.profiles import UserLanguageProfile, SupportedLanguage
-from app.services.realtime.translation_buffer import RealTimeTranslationBuffer, TranslationResult
-from app.services.realtime.fast_stt import FastSTTService, create_fast_stt_service
-from app.services.realtime.audio_router import CleanAudioRouter
-from app.services.translation.service import TranslationService
+from app.models.v1.domain.profiles import UserLanguageProfile, SupportedLanguage
+from app.services.v1.realtime.translation_buffer import RealTimeTranslationBuffer, TranslationResult
+from app.services.v1.realtime.fast_stt import FastSTTService, create_fast_stt_service
+from app.services.v1.realtime.audio_router import CleanAudioRouter
+from app.services.v1.translation.service import TranslationService
 
 
 @dataclass

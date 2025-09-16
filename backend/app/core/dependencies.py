@@ -1,8 +1,8 @@
 """
 Core dependencies for FastAPI application.
 """
-from app.services.livekit.room_manager import PatternBRoomManager
-from app.services.livekit.agent import LiveKitService
+from app.services.v1.livekit.room_manager import PatternBRoomManager
+from app.services.v1.livekit.agent import LiveKitService
 
 
 def get_livekit_service() -> LiveKitService:

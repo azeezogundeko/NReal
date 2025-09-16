@@ -4,7 +4,7 @@ Background task for cache cleanup and maintenance.
 import asyncio
 import logging
 from typing import Optional
-from app.services.livekit.room_manager import PatternBRoomManager
+from app.services.v1.livekit.room_manager import PatternBRoomManager
 
 
 class CacheCleanupService:

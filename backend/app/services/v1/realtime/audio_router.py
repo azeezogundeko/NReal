@@ -10,7 +10,7 @@ from enum import Enum
 import uuid
 
 from livekit import rtc
-from app.models.domain.profiles import SupportedLanguage
+from app.models.v1.domain.profiles import SupportedLanguage
 
 
 class AudioStreamType(Enum):

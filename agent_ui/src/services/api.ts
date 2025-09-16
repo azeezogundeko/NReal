@@ -11,6 +11,7 @@ export interface TokenRequest {
     name?: string;
     language?: string;
     avatar?: string;
+    room_type?: string;
   };
 }
 
@@ -42,6 +43,7 @@ export interface CreateRoomResponse {
     room_id: string;
     room_name: string;
     join_url: string;
+    max_participants?: number;
     host_profile?: {
       user_identity: string;
       native_language: string;
@@ -246,6 +248,245 @@ class ApiService {
     dispatches: any[];
   }> {
     return this.request(`/rooms/${encodeURIComponent(roomName)}/dispatches`);
+  }
+
+  /**
+   * Create a real-time translation room (2-user simultaneous interpretation)
+   */
+  async createTranslationRoom(
+    hostIdentity: string,
+    hostLanguage: string,
+    participantBIdentity: string,
+    participantBLanguage: string,
+    roomName?: string
+  ): Promise<{
+    room: {
+      room_id: string;
+      room_name: string;
+      room_type: string;
+      max_participants: number;
+      join_url: string;
+    };
+    participants: {
+      host: {
+        identity: string;
+        language: string;
+        token: string;
+        ws_url: string;
+      };
+      participant_b: {
+        identity: string;
+        language: string;
+        token: string;
+        ws_url: string;
+      };
+    };
+    translation_config: {
+      max_delay_ms: number;
+      interim_results: boolean;
+      utterance_end_ms: number;
+      audio_routing: boolean;
+    };
+  }> {
+    return this.request('/realtime-translation/rooms/create', {
+      method: 'POST',
+      body: JSON.stringify({
+        host_identity: hostIdentity,
+        host_language: hostLanguage,
+        participant_b_identity: participantBIdentity,
+        participant_b_language: participantBLanguage,
+        room_name: roomName,
+      }),
+    });
+  }
+
+  /**
+   * Get real-time translation statistics for a room
+   */
+  async getTranslationRoomStats(roomId: string): Promise<{
+    room_id: string;
+    room_name: string;
+    is_active: boolean;
+    translation_stats: any;
+    performance: {
+      target_delay_ms: number;
+      audio_routing_enabled: boolean;
+      interim_results_enabled: boolean;
+    };
+  }> {
+    return this.request(`/realtime-translation/rooms/${encodeURIComponent(roomId)}/stats`);
+  }
+
+  /**
+   * Create a test translation setup (Spanish <-> English)
+   */
+  async createTestTranslationSetup(): Promise<{
+    message: string;
+    room: {
+      room_id: string;
+      room_name: string;
+      join_url: string;
+    };
+    spanish_user: {
+      identity: string;
+      language: string;
+      token: string;
+      ws_url: string;
+    };
+    english_user: {
+      identity: string;
+      language: string;
+      token: string;
+      ws_url: string;
+    };
+    instructions: {
+      spanish_user: string;
+      english_user: string;
+      features: string[];
+    };
+  }> {
+    return this.request('/realtime-translation/test-setup', {
+      method: 'POST',
+    });
+  }
+
+  /**
+   * Get real-time translation configuration
+   */
+  async getTranslationConfig(): Promise<{
+    max_delay_ms: number;
+    interim_results: boolean;
+    utterance_end_ms: number;
+    punctuate: boolean;
+    smart_format: boolean;
+    profanity_filter: boolean;
+    redact: boolean;
+    diarize: boolean;
+    tier: string;
+    detect_language: boolean;
+    confidence_threshold: number;
+    audio_routing: boolean;
+    vad_enabled: boolean;
+    supported_languages: string[];
+    description: string;
+  }> {
+    return this.request('/realtime-translation/config');
+  }
+
+  /**
+   * Create a translation room using the dedicated translation-rooms endpoint
+   */
+  async createTranslationRoomNew(request: {
+    user_a_identity: string;
+    user_a_language: string;
+    user_a_name: string;
+    user_b_identity: string;
+    user_b_language: string;
+    user_b_name: string;
+    room_name?: string;
+  }): Promise<{
+    success: boolean;
+    room: {
+      room_name: string;
+      room_id: string;
+      room_type: string;
+      max_participants: number;
+    };
+    user_a: {
+      identity: string;
+      name: string;
+      language: string;
+      token: string;
+      server_url: string;
+    };
+    user_b: {
+      identity: string;
+      name: string;
+      language: string;
+      token: string;
+      server_url: string;
+    };
+    instructions: {
+      user_a: string;
+      user_b: string;
+      note: string;
+    };
+  }> {
+    return this.request('/translation-rooms/create', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+  }
+
+  /**
+   * Join an existing translation room
+   */
+  async joinTranslationRoom(request: {
+    room_name: string;
+    user_identity: string;
+    user_language: string;
+    user_name: string;
+  }): Promise<{
+    success: boolean;
+    user: {
+      identity: string;
+      name: string;
+      language: string;
+      token: string;
+      server_url: string;
+    };
+    room: {
+      room_name: string;
+      room_type: string;
+    };
+  }> {
+    return this.request('/translation-rooms/join', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+  }
+
+  /**
+   * Create a test translation room (English and Spanish users)
+   */
+  async createTestTranslationRoom(): Promise<{
+    success: boolean;
+    room: {
+      room_name: string;
+      room_id: string;
+      room_type: string;
+      max_participants: number;
+    };
+    user_a: {
+      identity: string;
+      name: string;
+      language: string;
+      token: string;
+      server_url: string;
+    };
+    user_b: {
+      identity: string;
+      name: string;
+      language: string;
+      token: string;
+      server_url: string;
+    };
+    instructions: {
+      user_a: string;
+      user_b: string;
+      note: string;
+    };
+    testing_instructions: {
+      step_1: string;
+      step_2: string;
+      step_3: string;
+      step_4: string;
+      expected_behavior: string;
+    };
+  }> {
+    return this.request('/translation-rooms/test-room', {
+      method: 'GET',
+    });
   }
 }
 
